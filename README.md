@@ -17,7 +17,7 @@ End Sub
 
 ## Proof
 Tools like MegaDumper and ExtremeDumper fail to complete the dump, lol.
-![MegaDumper](https://github.com/user-attachments/assets/1c7bb690-7925-4fec-a22b-06f98c969d23) ![MegaDumper](https://github.com/user-attachments/assets/8fc016f3-e231-4189-a8d0-d3374f065056)
+![ExtremeDumper@1x](https://github.com/user-attachments/assets/56948b3b-b8a7-4767-a94d-4e2725728b94) ![MegaDumper](https://github.com/user-attachments/assets/8fc016f3-e231-4189-a8d0-d3374f065056)
 
 ## Important Notes
 
