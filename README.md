@@ -22,6 +22,6 @@ Tools like MegaDumper and ExtremeDumper fail to complete the dump, lol.
 - This is just a simple method and need further improvements.
 
 ## Need Advanced Version ?
-I also offer a **paid and private version** of this anti-dump module with enhanced techniques.
+I also offer a **paid and private version** with enhanced techniques.
 
 Contact me on Telegram: [@ramaikn](https://t.me/ramaikn)
