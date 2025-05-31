@@ -1,6 +1,6 @@
 ## Simple Anti Dump
 
-This module provides anti-dumping protection for .NET applications that prevents automatic dumping tools. It works by Removes PE section headers, overwrites import table entries with fake data and clears the CLR header and .NET metadata streams.
+This module provides anti-dumping protection for .NET applications that prevents automatic dumping tools. It works by Removes PE section headers, overwrites import table entries with fake data and clear the CLR header and .NET metadata streams.
 
 ## Usage
 
