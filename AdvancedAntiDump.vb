@@ -1,9 +1,5 @@
 
-' Contact me 
-
-
-
-
+' Contact me on telegram : t.me/ramaikn
 
 w3I1jvb I9ordI.BOrmP6Vkwj
 1yjT7qD 7lQhuJ.sgwATP3.vkpY7ydwD9hK9TQ
