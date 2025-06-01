@@ -21,7 +21,5 @@ Tools like MegaDumper and ExtremeDumper fail to complete the dump, lol.
 ## Important Notes
 - This is just a simple method and need further improvements.
 
-## Need Advanced Version ?
-I also offer a cheap **paid and private version** with more advanced techniques.
-
+## Advanced Version
 Contact me on Telegram: [@ramaikn](https://t.me/ramaikn)
