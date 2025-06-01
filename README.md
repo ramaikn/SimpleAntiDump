@@ -19,7 +19,8 @@ Tools like MegaDumper and ExtremeDumper fail to complete the dump, lol.
 ![ExtremeDumper@1x](https://github.com/user-attachments/assets/56948b3b-b8a7-4767-a94d-4e2725728b94) ![MegaDumper](https://github.com/user-attachments/assets/8fc016f3-e231-4189-a8d0-d3374f065056)
 
 ## Important Notes
-- This is just a simple method and need further improvements.
+- This only prevents automatic dumping and remains vulnerable to manual dumping techniques.
+- Use my advanced anti-dump version or tweak it yourself to improve protection.
 
 ## Advanced Version
 Contact me on Telegram: [@ramaikn](https://t.me/ramaikn)
