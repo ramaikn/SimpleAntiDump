@@ -39,7 +39,7 @@ Tools like MegaDumper and ExtremeDumper fail to complete the dump, lol.
 
 ## Important Notes
 - This only prevents automatic dumping and remains vulnerable to manual dumping techniques.
-- Use my advanced anti-dump version or tweak it yourself to improve protection.
+- My advanced anti-dump version, will prevent most common manual dumping method.
 
 ## Advanced Version
 Contact me on Telegram: [@ramaikn](https://t.me/ramaikn)
