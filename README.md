@@ -2,28 +2,28 @@
 This module provides anti-dumping protection for .NET applications that prevents automatic dumping tools.
 
 ## How it Works
-### PE Header Scrubbing
+*PE Header Scrubbing*
 - Wipes the start of the DOS header and the `e_lfanew` pointer.
 - Nulls the PE header in memory to break signature-based detection.
-### Directory Table Scrambling
+*Directory Table Scrambling*
 - Clears all 16 `IMAGE_DATA_DIRECTORY` entries (Export, Import, Resource, etc.).
 - Makes directory-based tools unable to parse the file properly.
-### Export & Debug Directory Cleanup
+*Export & Debug Directory Cleanup*
 - Finds the Export and Debug directories.
 - Zeros out their data and clears the RVA/Size entries.
-### Import Table & IAT Corruption
+*Import Table & IAT Corruption*
 - Replaces module and function names with fake/random data.
 - Clears raw Import Table bytes to block import-based analysis.
-### Base Relocation Table Scrambling
+*Base Relocation Table Scrambling*
 - Zeros out the Base Relocation block to prevent address fixups.
-### Section Table Tampering
+*Section Table Tampering*
 - Randomizes section names (like `.text`, `.rdata`) with arbitrary ASCII.
 - Scrambles `VirtualAddress`, `SizeOfRawData`, and `PointerToRawData`.
 - Corrupts `SectionAlignment` and `FileAlignment` values.
-### Section Virtual Size Tampering
+*Section Virtual Size Tampering*
 - Sets each section’s `VirtualSize` to zero.
 - Breaks consistency between file layout and memory mapping.
-### PE Header Removal
+*PE Header Removal*
 - Wipes the first 8 bytes at the module base.
 - Destroys key DOS header values, essentially erasing the PE structure.
 
