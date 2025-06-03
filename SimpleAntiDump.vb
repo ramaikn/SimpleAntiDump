@@ -1,9 +1,5 @@
-Imports System
 Imports System.Reflection
 Imports System.Runtime.InteropServices
-Imports System.Security
-Imports System.Security.Permissions
-Imports System.Threading
 
 Friend Module SimpleAntiDump
 
@@ -15,11 +11,28 @@ Friend Module SimpleAntiDump
         ByRef lpflOldProtect As UInteger) As Boolean
     End Function
 
+    <DllImport("kernel32.dll", CharSet:=CharSet.Ansi, SetLastError:=True)>
+    Private Function LoadLibrary(lpLibFileName As String) As IntPtr
+    End Function
+
+    <DllImport("kernel32.dll", CharSet:=CharSet.Ansi, SetLastError:=True)>
+    Private Function GetProcAddress(
+        hModule As IntPtr,
+        lpProcName As String
+    ) As IntPtr
+    End Function
+
     Private Const PAGE_EXECUTE_READWRITE As UInteger = &H40UI
+
+    <StructLayout(LayoutKind.Sequential)>
+    Private Structure EXCEPTION_POINTERS
+        Public ExceptionRecord As IntPtr
+        Public ContextRecord As IntPtr
+    End Structure
 
     Public Sub Protect()
         Try
-            Dim modl As [Module] = GetType(AntiDump).Module
+            Dim modl As [Module] = GetType(SimpleAntiDump).Module
             Dim baseAddr As IntPtr = Marshal.GetHINSTANCE(modl)
             Dim dosHdrOffsetPtr As IntPtr = New IntPtr(baseAddr.ToInt64() + &H3C)
             Dim e_lfanew As Integer = Marshal.ReadInt32(dosHdrOffsetPtr)
@@ -28,59 +41,110 @@ Friend Module SimpleAntiDump
             Dim optHeaderSize As UShort = CType(Marshal.ReadInt16(New IntPtr(ntHeaderPtr.ToInt64() + &HE)), UShort)
             Dim sectionTablePtr As IntPtr = New IntPtr(ntHeaderPtr.ToInt64() + &H18 + optHeaderSize)
             Dim oldProt As UInteger = 0
-            For i As Integer = 0 To sectionsCount - 1
-                Dim entryPtr As IntPtr = New IntPtr(sectionTablePtr.ToInt64() + (i * &H28))
-                If Not VirtualProtect(entryPtr, CType(8UI, UIntPtr), PAGE_EXECUTE_READWRITE, oldProt) Then
-                Else
-                    Dim zeroBytes As Byte() = New Byte(7) {}
-                    Marshal.Copy(zeroBytes, 0, entryPtr, 8)
-                End If
-            Next
-            Dim importDirRva As Integer = Marshal.ReadInt32(New IntPtr(ntHeaderPtr.ToInt64() + &H80))
-            If importDirRva <> 0 Then
-                Dim importDirPtr As IntPtr = New IntPtr(baseAddr.ToInt64() + importDirRva)
-                WipeImportTable(importDirPtr, baseAddr, sectionsCount, sectionTablePtr, oldProt)
-            End If
-            Dim clrDirRva As Integer = Marshal.ReadInt32(New IntPtr(ntHeaderPtr.ToInt64() + &H88))
-            If clrDirRva <> 0 Then
-                Dim clrDirPtr As IntPtr = New IntPtr(baseAddr.ToInt64() + clrDirRva)
-                If VirtualProtect(clrDirPtr, CType(&H48UI, UIntPtr), PAGE_EXECUTE_READWRITE, oldProt) Then
-                    For offset As Integer = 0 To &H3C Step 4
-                        Marshal.WriteInt32(New IntPtr(clrDirPtr.ToInt64() + offset), 0)
-                    Next
-                    Dim metaDataRva As Integer = Marshal.ReadInt32(New IntPtr(clrDirPtr.ToInt64() + &H8))
-                    If metaDataRva <> 0 Then
-                        Dim metaDataPtr As IntPtr = New IntPtr(baseAddr.ToInt64() + metaDataRva)
-                        If VirtualProtect(metaDataPtr, CType(4UI, UIntPtr), PAGE_EXECUTE_READWRITE, oldProt) Then
-                            Marshal.WriteInt32(metaDataPtr, 0)
-                        End If
-                        Dim offsetBase As Integer = &H10 + Marshal.ReadInt32(New IntPtr(metaDataPtr.ToInt64() + &HC))
-                        offsetBase = (offsetBase + 3) And Not 3
-                        Dim streamsCount As UShort = CType(Marshal.ReadInt16(New IntPtr(metaDataPtr.ToInt64() + offsetBase)), UShort)
-                        offsetBase += 2
-
-                        For s As Integer = 0 To streamsCount - 1
-                            If VirtualProtect(New IntPtr(metaDataPtr.ToInt64() + offsetBase), CType(8UI, UIntPtr), PAGE_EXECUTE_READWRITE, oldProt) Then
-                                Marshal.WriteInt32(New IntPtr(metaDataPtr.ToInt64() + offsetBase), 0)
-                                Marshal.WriteInt32(New IntPtr(metaDataPtr.ToInt64() + offsetBase + 4), 0)
-                            End If
-                            Dim nameIter As Integer = 0
-                            Do
-                                nameIter += 1
-                            Loop While Marshal.ReadByte(New IntPtr(metaDataPtr.ToInt64() + offsetBase + 8 + nameIter - 1)) <> 0
-                            offsetBase += 8 + ((nameIter + 1 + 3) And Not 3)
-                        Next
-                    End If
-                End If
-            End If
-
-
+            ScrambleDirectoryTable(baseAddr, ntHeaderPtr, oldProt) 'EXTREME
+            ScrubExportAndDebugDirs(baseAddr, ntHeaderPtr, oldProt) 'NORMAL
+            ScrambleBaseRelocTable(baseAddr, ntHeaderPtr, oldProt) 'NORMAL
+            CorruptSectionAlignment(ntHeaderPtr, oldProt)    'EXTREME
+            RandomizeSectionNames(sectionTablePtr, sectionsCount, oldProt) ''EXTREME
+            TamperVirtualSize(sectionTablePtr, sectionsCount, oldProt) 'NORMAL
+            WipeImportTable(baseAddr, ntHeaderPtr, sectionsCount, oldProt)  'NORMAL
+            CorruptIAT(baseAddr, ntHeaderPtr, oldProt)  'NORMAL
+            WipeSectionTable(sectionTablePtr, sectionsCount, oldProt)   'EXTREME
+            WipePEHeader(baseAddr)     'EXTREME
         Catch ex As Exception
+
         End Try
     End Sub
 
-    Private Sub WipeImportTable(importDirPtr As IntPtr, baseAddr As IntPtr, sectCount As Integer, sectionTablePtr As IntPtr, oldProtect As UInteger)
+    Private Sub WipePEHeader(baseAddr As IntPtr)
+
         Try
+            Dim oldProt As UInteger = 0
+            If VirtualProtect(baseAddr, CType(8, UIntPtr), PAGE_EXECUTE_READWRITE, oldProt) Then
+                Marshal.WriteInt16(baseAddr, 0)
+                Dim e_lfanew As Integer = Marshal.ReadInt32(IntPtr.Add(baseAddr, &H3C))
+                If e_lfanew > 0 AndAlso e_lfanew < &H400 Then
+                    Marshal.WriteInt32(IntPtr.Add(baseAddr, e_lfanew), 0)
+
+                End If
+                VirtualProtect(baseAddr, CType(8, UIntPtr), oldProt, oldProt)
+            End If
+        Catch
+        End Try
+    End Sub
+
+    Private Sub CorruptIAT(baseAddr As IntPtr, ntHeaderPtr As IntPtr, oldProt As UInteger)
+        Try
+
+            Dim importDirRva As Integer = Marshal.ReadInt32(IntPtr.Add(ntHeaderPtr, &H80))
+            Dim importDirSize As Integer = Marshal.ReadInt32(IntPtr.Add(ntHeaderPtr, &H84))
+            If importDirRva = 0 OrElse importDirSize = 0 Then Return
+
+            Dim importDirPtr As IntPtr = IntPtr.Add(baseAddr, importDirRva)
+            If VirtualProtect(importDirPtr, CType(importDirSize, UIntPtr), PAGE_EXECUTE_READWRITE, oldProt) Then
+                Dim zero(importDirSize - 1) As Byte
+                Marshal.Copy(zero, 0, importDirPtr, importDirSize)
+                VirtualProtect(importDirPtr, CType(importDirSize, UIntPtr), oldProt, oldProt)
+            End If
+        Catch
+        End Try
+    End Sub
+
+    Private Sub TamperVirtualSize(sectionTablePtr As IntPtr, sectionsCount As Integer, oldProtect As UInteger)
+        Try
+            For i As Integer = 0 To sectionsCount - 1
+                Dim entryPtr As IntPtr = New IntPtr(sectionTablePtr.ToInt64() + (i * &H28))
+                Dim virtSizePtr As IntPtr = New IntPtr(entryPtr.ToInt64() + &H8)
+                If VirtualProtect(virtSizePtr, CType(4UI, UIntPtr), PAGE_EXECUTE_READWRITE, oldProtect) Then
+                    Marshal.WriteInt32(virtSizePtr, 0)
+                End If
+            Next
+        Catch
+        End Try
+    End Sub
+
+    Private Sub WipeSectionTable(sectionTablePtr As IntPtr, sectionsCount As Integer, oldProt As UInteger)
+        Try
+            Dim rnd As New Random()
+            For i As Integer = 0 To sectionsCount - 1
+                Dim entryPtr As IntPtr = New IntPtr(sectionTablePtr.ToInt64() + (i * &H28))
+                Dim namePtr As IntPtr = entryPtr
+                If VirtualProtect(namePtr, CType(8UI, UIntPtr), PAGE_EXECUTE_READWRITE, oldProt) Then
+                    Dim newName As Byte() = New Byte(7) {}
+                    For j As Integer = 0 To 5
+                        newName(j) = CByte(rnd.Next(65, 91))
+                    Next
+                    newName(6) = 0
+                    newName(7) = 0
+                    Marshal.Copy(newName, 0, namePtr, 8)
+                    VirtualProtect(namePtr, CType(8UI, UIntPtr), oldProt, oldProt)
+                End If
+                Dim vaPtr As IntPtr = IntPtr.Add(entryPtr, 12)
+                Dim rawPtr As IntPtr = IntPtr.Add(entryPtr, 20)
+                Dim charPtr As IntPtr = IntPtr.Add(entryPtr, 36)
+                If VirtualProtect(vaPtr, CType(4UI, UIntPtr), PAGE_EXECUTE_READWRITE, oldProt) Then
+                    Marshal.WriteInt32(vaPtr, rnd.Next(&H1000, &H80000))
+                    VirtualProtect(vaPtr, CType(4UI, UIntPtr), oldProt, oldProt)
+                End If
+                If VirtualProtect(rawPtr, CType(4UI, UIntPtr), PAGE_EXECUTE_READWRITE, oldProt) Then
+                    Marshal.WriteInt32(rawPtr, rnd.Next(&H200, &H10000))
+                    VirtualProtect(rawPtr, CType(4UI, UIntPtr), oldProt, oldProt)
+                End If
+                If VirtualProtect(charPtr, CType(4UI, UIntPtr), PAGE_EXECUTE_READWRITE, oldProt) Then
+                    Marshal.WriteInt32(charPtr, rnd.Next())
+                    VirtualProtect(charPtr, CType(4UI, UIntPtr), oldProt, oldProt)
+                End If
+            Next
+        Catch
+        End Try
+    End Sub
+
+    Private Sub WipeImportTable(baseAddr As IntPtr, ntHeaderPtr As IntPtr, sectCount As Integer, oldProtect As UInteger)
+        Try
+            Dim importDirRva As Integer = Marshal.ReadInt32(New IntPtr(ntHeaderPtr.ToInt64() + &H80))
+            If importDirRva = 0 Then Return
+            Dim importDirPtr As IntPtr = New IntPtr(baseAddr.ToInt64() + importDirRva)
+
             Dim iterPtr As IntPtr = importDirPtr
             Do
                 Dim oftRva As Integer = Marshal.ReadInt32(iterPtr)
@@ -138,4 +202,111 @@ Friend Module SimpleAntiDump
         End Try
     End Sub
 
+
+    Private Sub ScrambleDirectoryTable(baseAddr As IntPtr, ntHeaderPtr As IntPtr, oldProtect As UInteger)
+        Try
+            Dim dataDirPtr As IntPtr = New IntPtr(ntHeaderPtr.ToInt64() + &H80)
+            Dim totalSize As Integer = 16 * 8
+            If VirtualProtect(dataDirPtr, CType(totalSize, UIntPtr), PAGE_EXECUTE_READWRITE, oldProtect) Then
+                For offset As Integer = 0 To totalSize - 1
+                    Marshal.WriteByte(New IntPtr(dataDirPtr.ToInt64() + offset), 0)
+                Next
+            End If
+        Catch
+        End Try
+    End Sub
+
+    Private Sub ScrubExportAndDebugDirs(baseAddr As IntPtr, ntHeaderPtr As IntPtr, oldProtect As UInteger)
+        Try
+            Dim exportDirOffset As IntPtr = IntPtr.Add(ntHeaderPtr, &H78)
+            Dim exportRva As Integer = Marshal.ReadInt32(exportDirOffset)
+            Dim exportSize As Integer = Marshal.ReadInt32(IntPtr.Add(ntHeaderPtr, &H7C))
+
+            If exportRva > 0 AndAlso exportSize > 0 Then
+                Dim exportPtr As IntPtr = IntPtr.Add(baseAddr, exportRva)
+                Dim tempProtect As UInteger = 0
+
+                If VirtualProtect(exportPtr, CType(exportSize, UIntPtr), PAGE_EXECUTE_READWRITE, tempProtect) Then
+                    Dim zero(exportSize - 1) As Byte
+                    Marshal.Copy(zero, 0, exportPtr, exportSize)
+                    VirtualProtect(exportPtr, CType(exportSize, UIntPtr), tempProtect, tempProtect)
+                End If
+
+                Marshal.WriteInt32(exportDirOffset, 0)
+                Marshal.WriteInt32(IntPtr.Add(ntHeaderPtr, &H7C), 0)
+            End If
+
+            Dim debugDirOffset As IntPtr = IntPtr.Add(ntHeaderPtr, &HA8)
+            Dim debugRva As Integer = Marshal.ReadInt32(debugDirOffset)
+            Dim debugSize As Integer = Marshal.ReadInt32(IntPtr.Add(ntHeaderPtr, &HAC))
+
+            If debugRva > 0 AndAlso debugSize > 0 Then
+                Dim debugPtr As IntPtr = IntPtr.Add(baseAddr, debugRva)
+                Dim tempProtect As UInteger = 0
+
+                If VirtualProtect(debugPtr, CType(debugSize, UIntPtr), PAGE_EXECUTE_READWRITE, tempProtect) Then
+                    Dim zero(debugSize - 1) As Byte
+                    Marshal.Copy(zero, 0, debugPtr, debugSize)
+                    VirtualProtect(debugPtr, CType(debugSize, UIntPtr), tempProtect, tempProtect)
+                End If
+
+                Marshal.WriteInt32(debugDirOffset, 0)
+                Marshal.WriteInt32(IntPtr.Add(ntHeaderPtr, &HAC), 0)
+            End If
+
+        Catch ex As Exception
+        End Try
+    End Sub
+
+    Private Sub RandomizeSectionNames(sectionTablePtr As IntPtr, sectionsCount As Integer, oldProtect As UInteger)
+        Try
+            Dim rnd As New Random()
+            For i As Integer = 0 To sectionsCount - 1
+                Dim entryPtr As IntPtr = New IntPtr(sectionTablePtr.ToInt64() + (i * &H28))
+                Dim namePtr As IntPtr = entryPtr
+                If VirtualProtect(namePtr, CType(8UI, UIntPtr), PAGE_EXECUTE_READWRITE, oldProtect) Then
+                    Dim newName As Byte() = New Byte(7) {}
+                    For j As Integer = 0 To 5
+                        Dim c As Char = ChrW(AscW("A"c) + rnd.Next(0, 26))
+                        newName(j) = CByte(AscW(c))
+                    Next
+                    newName(6) = 0
+                    newName(7) = 0
+                    For j As Integer = 0 To 7
+                        Marshal.WriteByte(New IntPtr(namePtr.ToInt64() + j), newName(j))
+                    Next
+                End If
+            Next
+        Catch
+        End Try
+    End Sub
+
+    Private Sub ScrambleBaseRelocTable(baseAddr As IntPtr, ntHeaderPtr As IntPtr, oldProtect As UInteger)
+        Try
+            Dim relocDirRva As Integer = Marshal.ReadInt32(New IntPtr(ntHeaderPtr.ToInt64() + &HA0))
+            Dim relocDirSize As Integer = Marshal.ReadInt32(New IntPtr(ntHeaderPtr.ToInt64() + &HA4))
+            If relocDirRva = 0 OrElse relocDirSize = 0 Then Return
+            Dim relocPtr As IntPtr = New IntPtr(baseAddr.ToInt64() + relocDirRva)
+            If VirtualProtect(relocPtr, CType(relocDirSize, UIntPtr), PAGE_EXECUTE_READWRITE, oldProtect) Then
+                Dim zeroBuf(relocDirSize - 1) As Byte
+                Marshal.Copy(zeroBuf, 0, relocPtr, relocDirSize)
+            End If
+        Catch
+        End Try
+    End Sub
+
+    Private Sub CorruptSectionAlignment(ntHeaderPtr As IntPtr, oldProtect As UInteger)
+        Try
+
+            Dim sectionAlignPtr As IntPtr = IntPtr.Add(ntHeaderPtr, &H38)
+            Dim fileAlignPtr As IntPtr = IntPtr.Add(ntHeaderPtr, &H3C)
+            If VirtualProtect(sectionAlignPtr, CType(8UI, UIntPtr), PAGE_EXECUTE_READWRITE, oldProtect) Then
+                Marshal.WriteInt32(sectionAlignPtr, &H1)
+                Marshal.WriteInt32(fileAlignPtr, &H1)
+            End If
+        Catch
+        End Try
+    End Sub
+
 End Module
+
