@@ -17,7 +17,7 @@ This module provides anti-dumping protection for .NET applications that prevents
 - Corrupts `SectionAlignment` and `FileAlignment` values.
 - Sets each section’s `VirtualSize` to zero.
 - Breaks consistency between file layout and memory mapping.
-- Wipes the first 8 bytes at the module base.
+- Wipes the first 2 bytes at the module base.
 - Destroys key DOS header values, essentially erasing the PE structure.
 
 ## Usage
