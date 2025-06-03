@@ -4,7 +4,7 @@ This module provides anti-dumping protection for .NET applications that prevents
 ## How it Works
 
 - Wipes the start of the DOS header and the `e_lfanew` pointer.
-- Nulls the PE header in memory to break signature-based detection.
+- Nulls the signature PE in memory to break signature-based detection.
 - Clears all 16 `IMAGE_DATA_DIRECTORY` entries (Export, Import, Resource, etc.).
 - Makes directory-based tools unable to parse the file properly.
 - Finds the Export and Debug directories.
