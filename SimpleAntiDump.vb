@@ -41,16 +41,16 @@ Friend Module SimpleAntiDump
             Dim optHeaderSize As UShort = CType(Marshal.ReadInt16(New IntPtr(ntHeaderPtr.ToInt64() + &HE)), UShort)
             Dim sectionTablePtr As IntPtr = New IntPtr(ntHeaderPtr.ToInt64() + &H18 + optHeaderSize)
             Dim oldProt As UInteger = 0
-            ScrambleDirectoryTable(baseAddr, ntHeaderPtr, oldProt) 'EXTREME
-            ScrubExportAndDebugDirs(baseAddr, ntHeaderPtr, oldProt) 'NORMAL
-            ScrambleBaseRelocTable(baseAddr, ntHeaderPtr, oldProt) 'NORMAL
-            CorruptSectionAlignment(ntHeaderPtr, oldProt)    'EXTREME
-            RandomizeSectionNames(sectionTablePtr, sectionsCount, oldProt) ''EXTREME
-            TamperVirtualSize(sectionTablePtr, sectionsCount, oldProt) 'NORMAL
-            WipeImportTable(baseAddr, ntHeaderPtr, sectionsCount, oldProt)  'NORMAL
-            CorruptIAT(baseAddr, ntHeaderPtr, oldProt)  'NORMAL
-            WipeSectionTable(sectionTablePtr, sectionsCount, oldProt)   'EXTREME
-            WipePEHeader(baseAddr)     'EXTREME
+            ScrubExportAndDebugDirs(baseAddr, ntHeaderPtr, oldProt) 'N
+            ScrambleBaseRelocTable(baseAddr, ntHeaderPtr, oldProt) 'N
+            WipeImportTable(baseAddr, ntHeaderPtr, sectionsCount, oldProt) 'N
+            CorruptIAT(baseAddr, ntHeaderPtr, oldProt) 'N
+            RandomizeSectionNames(sectionTablePtr, sectionsCount, oldProt) 'E
+            TamperVirtualSize(sectionTablePtr, sectionsCount, oldProt) 'N
+            WipeSectionTable(sectionTablePtr, sectionsCount, oldProt) 'E
+            CorruptSectionAlignment(ntHeaderPtr, oldProt) 'E
+            ScrambleDirectoryTable(baseAddr, ntHeaderPtr, oldProt) 'E
+            WipePEHeader(baseAddr) 'E
         Catch ex As Exception
 
         End Try
