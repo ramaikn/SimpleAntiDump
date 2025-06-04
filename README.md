@@ -3,22 +3,16 @@ This module provides anti-dumping protection for .NET applications that prevents
 
 ## How it Works
 
-- Wipes the start of the DOS header and the `e_lfanew` pointer.
-- Nulls the signature PE in memory to break signature-based detection.
-- Clears all 16 `IMAGE_DATA_DIRECTORY` entries (Export, Import, Resource, etc.).
-- Makes directory-based tools unable to parse the file properly.
-- Finds the Export and Debug directories.
-- Zeros out their data and clears the RVA/Size entries.
-- Replaces module and function names with fake/random data.
-- Clears raw Import Table bytes to block import-based analysis.
-- Zeros out the Base Relocation block to prevent address fixups.
-- Randomizes section names (like `.text`, `.rdata`) with arbitrary ASCII.
-- Scrambles `VirtualAddress`, `SizeOfRawData`, and `PointerToRawData`.
-- Corrupts `SectionAlignment` and `FileAlignment` values.
-- Sets each section’s `VirtualSize` to zero.
-- Breaks consistency between file layout and memory mapping.
-- Wipes the first 2 bytes at the module base.
-- Destroys key DOS header values, essentially erasing the PE structure.
+- **ScrubExportAndDebugDirs** : Erases the Export and Debug directories in the PE header and zeroes their RVA and size, removing export and debug information from the binary.
+- **ScrambleBaseRelocTable** : Overwrites the Base Relocation Table with zeros, preventing relocation information from being used by dumpers or loaders.
+- **WipeImportTable** : Overwrites module and function names in the Import Table with fake data, corrupting external dependency information.
+- **CorruptIAT **: Zeros out the Import Address Table (IAT), breaking the mapping of imported functions and making runtime resolution impossible.
+- **RandomizeSectionNames** : Randomizes the names of all sections in the Section Table, making section identification and analysis more difficult.
+- **TamperVirtualSize** : Sets the VirtualSize field of each section to zero, invalidating the in-memory size information for each section.
+- **WipeSectionTable** : Randomizes key fields in the Section Table (name, virtual address, raw size, characteristics), corrupting the section structure.
+- **CorruptSectionAlignment** : Sets SectionAlignment and FileAlignment in the Optional Header to 1, making the PE file invalid for loaders.
+- **ScrambleDirectoryTable** : Zeros out all entries in the Data Directory Table, removing RVA and size information for all PE structures (import, export, resource, etc).
+- **WipePEHeader** : Erases the DOS and NT headers (PE header), making the binary unrecognizable as a valid PE file.
 
 ## Usage
 Just Call `SimpleAntiDump.Protect()` at startup.
