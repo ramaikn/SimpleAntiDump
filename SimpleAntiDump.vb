@@ -4,7 +4,6 @@ Imports System.Runtime.InteropServices
 Friend Module SimpleAntiDump
 
     <DllImport("kernel32.dll", SetLastError:=True)>
-    <Obfuscation(Feature:="virtualization", Exclude:=False)>
     Private Function VirtualProtect(
         lpAddress As IntPtr,
         dwSize As UIntPtr,
@@ -13,12 +12,10 @@ Friend Module SimpleAntiDump
     End Function
 
     <DllImport("kernel32.dll", CharSet:=CharSet.Ansi, SetLastError:=True)>
-    <Obfuscation(Feature:="virtualization", Exclude:=False)>
     Private Function LoadLibrary(lpLibFileName As String) As IntPtr
     End Function
 
     <DllImport("kernel32.dll", CharSet:=CharSet.Ansi, SetLastError:=True)>
-    <Obfuscation(Feature:="virtualization", Exclude:=False)>
     Private Function GetProcAddress(
         hModule As IntPtr,
         lpProcName As String
@@ -28,12 +25,11 @@ Friend Module SimpleAntiDump
     Private Const PAGE_EXECUTE_READWRITE As UInteger = &H40UI
 
     <StructLayout(LayoutKind.Sequential)>
-    <Obfuscation(Feature:="virtualization", Exclude:=False)>
     Private Structure EXCEPTION_POINTERS
         Public ExceptionRecord As IntPtr
         Public ContextRecord As IntPtr
     End Structure
-    <Obfuscation(Feature:="virtualization", Exclude:=False)>
+
     Public Sub Protect()
         Try
             Dim modl As [Module] = GetType(SimpleAntiDump).Module
@@ -45,23 +41,21 @@ Friend Module SimpleAntiDump
             Dim optHeaderSize As UShort = CType(Marshal.ReadInt16(New IntPtr(ntHeaderPtr.ToInt64() + &HE)), UShort)
             Dim sectionTablePtr As IntPtr = New IntPtr(ntHeaderPtr.ToInt64() + &H18 + optHeaderSize)
             Dim oldProt As UInteger = 0
-            ScrambleDirectoryTable(baseAddr, ntHeaderPtr, oldProt) 'EXTREME
-            ScrubExportAndDebugDirs(baseAddr, ntHeaderPtr, oldProt) 'NORMAL
-            ScrambleBaseRelocTable(baseAddr, ntHeaderPtr, oldProt) 'NORMAL
-            CorruptSectionAlignment(ntHeaderPtr, oldProt)    'EXTREME
-            RandomizeSectionNames(sectionTablePtr, sectionsCount, oldProt) ''EXTREME
-            TamperVirtualSize(sectionTablePtr, sectionsCount, oldProt) 'NORMAL
-            WipeImportTable(baseAddr, ntHeaderPtr, sectionsCount, oldProt)  'NORMAL
-            CorruptIAT(baseAddr, ntHeaderPtr, oldProt)  'NORMAL
-            WipeSectionTable(sectionTablePtr, sectionsCount, oldProt)   'EXTREME
-            WipePEHeader(baseAddr)     'EXTREME
-        Catch ex As Exception
-
+            ZeroDataDirectoryTable(baseAddr, ntHeaderPtr, oldProt) 'E
+            ZeroExportAndDebugDirectories(baseAddr, ntHeaderPtr, oldProt) 'N
+            ZeroBaseRelocationTable(baseAddr, ntHeaderPtr, oldProt) 'N
+            CorruptSectionAlignment(ntHeaderPtr, oldProt) 'E
+            RandomizeSectionNames(sectionTablePtr, sectionsCount, oldProt) 'E
+            TamperVirtualSize(sectionTablePtr, sectionsCount, oldProt) 'N
+            CorruptImportNames(baseAddr, ntHeaderPtr, sectionsCount, oldProt) 'N
+            ZeroImportDirectory(baseAddr, ntHeaderPtr, oldProt) 'N
+            RandomizeSectionTableFields(sectionTablePtr, sectionsCount, oldProt) 'E
+            ZeroPESignatures(baseAddr) 'E
+        Catch
         End Try
     End Sub
-    <Obfuscation(Feature:="virtualization", Exclude:=False)>
-    Private Sub WipePEHeader(baseAddr As IntPtr)
 
+    Private Sub ZeroPESignatures(baseAddr As IntPtr)
         Try
             Dim oldProt As UInteger = 0
             If VirtualProtect(baseAddr, CType(8, UIntPtr), PAGE_EXECUTE_READWRITE, oldProt) Then
@@ -69,17 +63,15 @@ Friend Module SimpleAntiDump
                 Dim e_lfanew As Integer = Marshal.ReadInt32(IntPtr.Add(baseAddr, &H3C))
                 If e_lfanew > 0 AndAlso e_lfanew < &H400 Then
                     Marshal.WriteInt32(IntPtr.Add(baseAddr, e_lfanew), 0)
-
                 End If
                 VirtualProtect(baseAddr, CType(8, UIntPtr), oldProt, oldProt)
             End If
         Catch
         End Try
     End Sub
-    <Obfuscation(Feature:="virtualization", Exclude:=False)>
-    Private Sub CorruptIAT(baseAddr As IntPtr, ntHeaderPtr As IntPtr, oldProt As UInteger)
-        Try
 
+    Private Sub ZeroImportDirectory(baseAddr As IntPtr, ntHeaderPtr As IntPtr, oldProt As UInteger)
+        Try
             Dim importDirRva As Integer = Marshal.ReadInt32(IntPtr.Add(ntHeaderPtr, &H80))
             Dim importDirSize As Integer = Marshal.ReadInt32(IntPtr.Add(ntHeaderPtr, &H84))
             If importDirRva = 0 OrElse importDirSize = 0 Then Return
@@ -93,7 +85,7 @@ Friend Module SimpleAntiDump
         Catch
         End Try
     End Sub
-    <Obfuscation(Feature:="virtualization", Exclude:=False)>
+
     Private Sub TamperVirtualSize(sectionTablePtr As IntPtr, sectionsCount As Integer, oldProtect As UInteger)
         Try
             For i As Integer = 0 To sectionsCount - 1
@@ -106,8 +98,8 @@ Friend Module SimpleAntiDump
         Catch
         End Try
     End Sub
-    <Obfuscation(Feature:="virtualization", Exclude:=False)>
-    Private Sub WipeSectionTable(sectionTablePtr As IntPtr, sectionsCount As Integer, oldProt As UInteger)
+
+    Private Sub RandomizeSectionTableFields(sectionTablePtr As IntPtr, sectionsCount As Integer, oldProt As UInteger)
         Try
             Dim rnd As New Random()
             For i As Integer = 0 To sectionsCount - 1
@@ -142,13 +134,12 @@ Friend Module SimpleAntiDump
         Catch
         End Try
     End Sub
-    <Obfuscation(Feature:="virtualization", Exclude:=False)>
-    Private Sub WipeImportTable(baseAddr As IntPtr, ntHeaderPtr As IntPtr, sectCount As Integer, oldProtect As UInteger)
+
+    Private Sub CorruptImportNames(baseAddr As IntPtr, ntHeaderPtr As IntPtr, sectCount As Integer, oldProtect As UInteger)
         Try
             Dim importDirRva As Integer = Marshal.ReadInt32(New IntPtr(ntHeaderPtr.ToInt64() + &H80))
             If importDirRva = 0 Then Return
             Dim importDirPtr As IntPtr = New IntPtr(baseAddr.ToInt64() + importDirRva)
-
             Dim iterPtr As IntPtr = importDirPtr
             Do
                 Dim oftRva As Integer = Marshal.ReadInt32(iterPtr)
@@ -156,7 +147,6 @@ Friend Module SimpleAntiDump
                 If oftRva = 0 And nameRva = 0 Then
                     Exit Do
                 End If
-
                 Dim modNameRva As Integer = nameRva
                 Dim modNamePtr As IntPtr = New IntPtr(baseAddr.ToInt64() + modNameRva)
                 If VirtualProtect(modNamePtr, CType(12UI, UIntPtr), PAGE_EXECUTE_READWRITE, oldProtect) Then
@@ -172,7 +162,6 @@ Friend Module SimpleAntiDump
                         Marshal.WriteByte(New IntPtr(modNamePtr.ToInt64() + i), newBytes(i))
                     Next
                 End If
-
                 Dim iatRva As Integer = Marshal.ReadInt32(New IntPtr(iterPtr.ToInt64() + &H10))
                 If iatRva <> 0 Then
                     Dim iatPtr As IntPtr = New IntPtr(baseAddr.ToInt64() + iatRva)
@@ -198,15 +187,13 @@ Friend Module SimpleAntiDump
                         Next
                     End If
                 End If
-
                 iterPtr = New IntPtr(iterPtr.ToInt64() + &H14)
             Loop
-
         Catch
         End Try
     End Sub
-    <Obfuscation(Feature:="virtualization", Exclude:=False)>
-    Private Sub ScrambleDirectoryTable(baseAddr As IntPtr, ntHeaderPtr As IntPtr, oldProtect As UInteger)
+
+    Private Sub ZeroDataDirectoryTable(baseAddr As IntPtr, ntHeaderPtr As IntPtr, oldProtect As UInteger)
         Try
             Dim dataDirPtr As IntPtr = New IntPtr(ntHeaderPtr.ToInt64() + &H80)
             Dim totalSize As Integer = 16 * 8
@@ -218,13 +205,12 @@ Friend Module SimpleAntiDump
         Catch
         End Try
     End Sub
-    <Obfuscation(Feature:="virtualization", Exclude:=False)>
-    Private Sub ScrubExportAndDebugDirs(baseAddr As IntPtr, ntHeaderPtr As IntPtr, oldProtect As UInteger)
+
+    Private Sub ZeroExportAndDebugDirectories(baseAddr As IntPtr, ntHeaderPtr As IntPtr, oldProtect As UInteger)
         Try
             Dim exportDirOffset As IntPtr = IntPtr.Add(ntHeaderPtr, &H78)
             Dim exportRva As Integer = Marshal.ReadInt32(exportDirOffset)
             Dim exportSize As Integer = Marshal.ReadInt32(IntPtr.Add(ntHeaderPtr, &H7C))
-
             If exportRva > 0 AndAlso exportSize > 0 Then
                 Dim exportPtr As IntPtr = IntPtr.Add(baseAddr, exportRva)
                 Dim tempProtect As UInteger = 0
@@ -234,33 +220,27 @@ Friend Module SimpleAntiDump
                     Marshal.Copy(zero, 0, exportPtr, exportSize)
                     VirtualProtect(exportPtr, CType(exportSize, UIntPtr), tempProtect, tempProtect)
                 End If
-
                 Marshal.WriteInt32(exportDirOffset, 0)
                 Marshal.WriteInt32(IntPtr.Add(ntHeaderPtr, &H7C), 0)
             End If
-
             Dim debugDirOffset As IntPtr = IntPtr.Add(ntHeaderPtr, &HA8)
             Dim debugRva As Integer = Marshal.ReadInt32(debugDirOffset)
             Dim debugSize As Integer = Marshal.ReadInt32(IntPtr.Add(ntHeaderPtr, &HAC))
-
             If debugRva > 0 AndAlso debugSize > 0 Then
                 Dim debugPtr As IntPtr = IntPtr.Add(baseAddr, debugRva)
                 Dim tempProtect As UInteger = 0
-
                 If VirtualProtect(debugPtr, CType(debugSize, UIntPtr), PAGE_EXECUTE_READWRITE, tempProtect) Then
                     Dim zero(debugSize - 1) As Byte
                     Marshal.Copy(zero, 0, debugPtr, debugSize)
                     VirtualProtect(debugPtr, CType(debugSize, UIntPtr), tempProtect, tempProtect)
                 End If
-
                 Marshal.WriteInt32(debugDirOffset, 0)
                 Marshal.WriteInt32(IntPtr.Add(ntHeaderPtr, &HAC), 0)
             End If
-
-        Catch ex As Exception
+        Catch
         End Try
     End Sub
-    <Obfuscation(Feature:="virtualization", Exclude:=False)>
+
     Private Sub RandomizeSectionNames(sectionTablePtr As IntPtr, sectionsCount As Integer, oldProtect As UInteger)
         Try
             Dim rnd As New Random()
@@ -283,8 +263,8 @@ Friend Module SimpleAntiDump
         Catch
         End Try
     End Sub
-    <Obfuscation(Feature:="virtualization", Exclude:=False)>
-    Private Sub ScrambleBaseRelocTable(baseAddr As IntPtr, ntHeaderPtr As IntPtr, oldProtect As UInteger)
+
+    Private Sub ZeroBaseRelocationTable(baseAddr As IntPtr, ntHeaderPtr As IntPtr, oldProtect As UInteger)
         Try
             Dim relocDirRva As Integer = Marshal.ReadInt32(New IntPtr(ntHeaderPtr.ToInt64() + &HA0))
             Dim relocDirSize As Integer = Marshal.ReadInt32(New IntPtr(ntHeaderPtr.ToInt64() + &HA4))
@@ -297,10 +277,9 @@ Friend Module SimpleAntiDump
         Catch
         End Try
     End Sub
-    <Obfuscation(Feature:="virtualization", Exclude:=False)>
+
     Private Sub CorruptSectionAlignment(ntHeaderPtr As IntPtr, oldProtect As UInteger)
         Try
-
             Dim sectionAlignPtr As IntPtr = IntPtr.Add(ntHeaderPtr, &H38)
             Dim fileAlignPtr As IntPtr = IntPtr.Add(ntHeaderPtr, &H3C)
             If VirtualProtect(sectionAlignPtr, CType(8UI, UIntPtr), PAGE_EXECUTE_READWRITE, oldProtect) Then
