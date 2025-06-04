@@ -51,7 +51,7 @@ Friend Module SimpleAntiDump
             CorruptSectionAlignment(ntHeaderPtr, oldProt) 'E
             ScrambleDirectoryTable(baseAddr, ntHeaderPtr, oldProt) 'E
             WipePEHeader(baseAddr) 'E
-        Catch ex As Exception
+        Catch
         End Try
     End Sub
 
@@ -188,7 +188,6 @@ Friend Module SimpleAntiDump
                 End If
                 iterPtr = New IntPtr(iterPtr.ToInt64() + &H14)
             Loop
-
         Catch
         End Try
     End Sub
@@ -238,7 +237,7 @@ Friend Module SimpleAntiDump
                 Marshal.WriteInt32(debugDirOffset, 0)
                 Marshal.WriteInt32(IntPtr.Add(ntHeaderPtr, &HAC), 0)
             End If
-        Catch ex As Exception
+        Catch
         End Try
     End Sub
 
