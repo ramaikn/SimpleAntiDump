@@ -26,10 +26,9 @@ Just Call `SimpleAntiDump.Protect()` at startup.
 Example:
 
 ```vb.net
-Sub Main()
-    SimpleAntiDump.Protect()
-    Application.Run(New MainForm())
-End Sub
+    Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        SimpleAntiDump.Protect()
+    End Sub
 ```
 
 ## Proof
