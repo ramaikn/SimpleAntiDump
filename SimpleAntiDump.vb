@@ -52,12 +52,10 @@ Friend Module SimpleAntiDump
             ScrambleDirectoryTable(baseAddr, ntHeaderPtr, oldProt) 'E
             WipePEHeader(baseAddr) 'E
         Catch ex As Exception
-
         End Try
     End Sub
 
     Private Sub WipePEHeader(baseAddr As IntPtr)
-
         Try
             Dim oldProt As UInteger = 0
             If VirtualProtect(baseAddr, CType(8, UIntPtr), PAGE_EXECUTE_READWRITE, oldProt) Then
@@ -65,7 +63,6 @@ Friend Module SimpleAntiDump
                 Dim e_lfanew As Integer = Marshal.ReadInt32(IntPtr.Add(baseAddr, &H3C))
                 If e_lfanew > 0 AndAlso e_lfanew < &H400 Then
                     Marshal.WriteInt32(IntPtr.Add(baseAddr, e_lfanew), 0)
-
                 End If
                 VirtualProtect(baseAddr, CType(8, UIntPtr), oldProt, oldProt)
             End If
@@ -75,11 +72,9 @@ Friend Module SimpleAntiDump
 
     Private Sub CorruptIAT(baseAddr As IntPtr, ntHeaderPtr As IntPtr, oldProt As UInteger)
         Try
-
             Dim importDirRva As Integer = Marshal.ReadInt32(IntPtr.Add(ntHeaderPtr, &H80))
             Dim importDirSize As Integer = Marshal.ReadInt32(IntPtr.Add(ntHeaderPtr, &H84))
             If importDirRva = 0 OrElse importDirSize = 0 Then Return
-
             Dim importDirPtr As IntPtr = IntPtr.Add(baseAddr, importDirRva)
             If VirtualProtect(importDirPtr, CType(importDirSize, UIntPtr), PAGE_EXECUTE_READWRITE, oldProt) Then
                 Dim zero(importDirSize - 1) As Byte
@@ -144,7 +139,6 @@ Friend Module SimpleAntiDump
             Dim importDirRva As Integer = Marshal.ReadInt32(New IntPtr(ntHeaderPtr.ToInt64() + &H80))
             If importDirRva = 0 Then Return
             Dim importDirPtr As IntPtr = New IntPtr(baseAddr.ToInt64() + importDirRva)
-
             Dim iterPtr As IntPtr = importDirPtr
             Do
                 Dim oftRva As Integer = Marshal.ReadInt32(iterPtr)
@@ -152,7 +146,6 @@ Friend Module SimpleAntiDump
                 If oftRva = 0 And nameRva = 0 Then
                     Exit Do
                 End If
-
                 Dim modNameRva As Integer = nameRva
                 Dim modNamePtr As IntPtr = New IntPtr(baseAddr.ToInt64() + modNameRva)
                 If VirtualProtect(modNamePtr, CType(12UI, UIntPtr), PAGE_EXECUTE_READWRITE, oldProtect) Then
@@ -168,7 +161,6 @@ Friend Module SimpleAntiDump
                         Marshal.WriteByte(New IntPtr(modNamePtr.ToInt64() + i), newBytes(i))
                     Next
                 End If
-
                 Dim iatRva As Integer = Marshal.ReadInt32(New IntPtr(iterPtr.ToInt64() + &H10))
                 If iatRva <> 0 Then
                     Dim iatPtr As IntPtr = New IntPtr(baseAddr.ToInt64() + iatRva)
@@ -194,7 +186,6 @@ Friend Module SimpleAntiDump
                         Next
                     End If
                 End If
-
                 iterPtr = New IntPtr(iterPtr.ToInt64() + &H14)
             Loop
 
@@ -221,25 +212,20 @@ Friend Module SimpleAntiDump
             Dim exportDirOffset As IntPtr = IntPtr.Add(ntHeaderPtr, &H78)
             Dim exportRva As Integer = Marshal.ReadInt32(exportDirOffset)
             Dim exportSize As Integer = Marshal.ReadInt32(IntPtr.Add(ntHeaderPtr, &H7C))
-
             If exportRva > 0 AndAlso exportSize > 0 Then
                 Dim exportPtr As IntPtr = IntPtr.Add(baseAddr, exportRva)
                 Dim tempProtect As UInteger = 0
-
                 If VirtualProtect(exportPtr, CType(exportSize, UIntPtr), PAGE_EXECUTE_READWRITE, tempProtect) Then
                     Dim zero(exportSize - 1) As Byte
                     Marshal.Copy(zero, 0, exportPtr, exportSize)
                     VirtualProtect(exportPtr, CType(exportSize, UIntPtr), tempProtect, tempProtect)
                 End If
-
                 Marshal.WriteInt32(exportDirOffset, 0)
                 Marshal.WriteInt32(IntPtr.Add(ntHeaderPtr, &H7C), 0)
             End If
-
             Dim debugDirOffset As IntPtr = IntPtr.Add(ntHeaderPtr, &HA8)
             Dim debugRva As Integer = Marshal.ReadInt32(debugDirOffset)
             Dim debugSize As Integer = Marshal.ReadInt32(IntPtr.Add(ntHeaderPtr, &HAC))
-
             If debugRva > 0 AndAlso debugSize > 0 Then
                 Dim debugPtr As IntPtr = IntPtr.Add(baseAddr, debugRva)
                 Dim tempProtect As UInteger = 0
@@ -249,11 +235,9 @@ Friend Module SimpleAntiDump
                     Marshal.Copy(zero, 0, debugPtr, debugSize)
                     VirtualProtect(debugPtr, CType(debugSize, UIntPtr), tempProtect, tempProtect)
                 End If
-
                 Marshal.WriteInt32(debugDirOffset, 0)
                 Marshal.WriteInt32(IntPtr.Add(ntHeaderPtr, &HAC), 0)
             End If
-
         Catch ex As Exception
         End Try
     End Sub
@@ -297,7 +281,6 @@ Friend Module SimpleAntiDump
 
     Private Sub CorruptSectionAlignment(ntHeaderPtr As IntPtr, oldProtect As UInteger)
         Try
-
             Dim sectionAlignPtr As IntPtr = IntPtr.Add(ntHeaderPtr, &H38)
             Dim fileAlignPtr As IntPtr = IntPtr.Add(ntHeaderPtr, &H3C)
             If VirtualProtect(sectionAlignPtr, CType(8UI, UIntPtr), PAGE_EXECUTE_READWRITE, oldProtect) Then
