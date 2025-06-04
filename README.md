@@ -6,7 +6,7 @@ This module provides anti-dumping protection for .NET applications that prevents
 - **ScrubExportAndDebugDirs** : Erases the Export and Debug directories in the PE header and zeroes their RVA and size, removing export and debug information from the binary.
 - **ScrambleBaseRelocTable** : Overwrites the Base Relocation Table with zeros, preventing relocation information from being used by dumpers or loaders.
 - **WipeImportTable** : Overwrites module and function names in the Import Table with fake data, corrupting external dependency information.
-- **CorruptIAT **: Zeros out the Import Address Table (IAT), breaking the mapping of imported functions and making runtime resolution impossible.
+- **CorruptIAT**: Zeros out the Import Address Table (IAT), breaking the mapping of imported functions and making runtime resolution impossible.
 - **RandomizeSectionNames** : Randomizes the names of all sections in the Section Table, making section identification and analysis more difficult.
 - **TamperVirtualSize** : Sets the VirtualSize field of each section to zero, invalidating the in-memory size information for each section.
 - **WipeSectionTable** : Randomizes key fields in the Section Table (name, virtual address, raw size, characteristics), corrupting the section structure.
